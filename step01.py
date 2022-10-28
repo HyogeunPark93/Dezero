@@ -1,23 +1,37 @@
 from cgitb import grey
+from statistics import variance
 import numpy as np
 
 class Variable:
     def __init__(self, data):
         self.data = data
         self.grad = None
+        self.creator = None
+        
+    def set_creater(self, func):
+        self.creator = func
+        
+    def backward(self):
+        f = self.creator
+        if f is not None:
+            x = f.input
+            x.grad = f.backward(self.grad)
+            x.backward() 
         
 class Function:
     def __call__(self, input):
         x = input.data
         y = self.forward(x)
         output = Variable(y)
+        output.set_creater(self)
         self.input = input
+        self.output = output
         return output
     
     def forward(self, x): # 순전파
         raise NotImplementedError()
     
-    def backward(self,x):
+    def backward(self,x): # 역전파
         raise NotImplementedError()
     
 class Square(Function):
@@ -45,18 +59,16 @@ def numerical_diff(f, x, eps = 1e-4):
     y0 = f(x0)
     y1 = f(x1)
     return (y1.data - y0.data / (2 * eps))
-    
+
 A = Square()
 B = Exp()
 C = Square()
 
-x = Variable(np.array(.5))
+x = Variable(np.array(0.5))
 a = A(x)
 b = B(a)
 y = C(b)
 
 y.grad = np.array(1.0)
-b.grad = C.backward(y.grad)
-a.grad = B.backward(b.grad)
-x.grad = A.backward(a.grad)
-print(x.grad)
+y.backward()
+print(b.grad)
