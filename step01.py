@@ -4,6 +4,10 @@ import numpy as np
 
 class Variable:
     def __init__(self, data):
+        if data is not None:
+            if not isinstance(data, np.ndarray):
+                raise TypeError('{}은(는) 지원하지 않습니다'.foramt(type(data)))
+        
         self.data = data
         self.grad = None
         self.creator = None
@@ -12,17 +16,22 @@ class Variable:
         self.creator = func
         
     def backward(self):
-        f = self.creator
-        if f is not None:
-            x = f.input
-            x.grad = f.backward(self.grad)
-            x.backward() 
+        if self.grad is None:
+            self.grad = np.ones_like(self.data)
+        funcs = [self.creator]
+        while funcs:
+            f = funcs.pop()
+            x, y, = f.input, f.output
+            x.grad = f.backward(y.grad)
+            
+            if x.creator is not None:
+                funcs.append(x.creator)
         
 class Function:
     def __call__(self, input):
         x = input.data
         y = self.forward(x)
-        output = Variable(y)
+        output = Variable(as_arrray(y))
         output.set_creater(self)
         self.input = input
         self.output = output
@@ -33,6 +42,7 @@ class Function:
     
     def backward(self,x): # 역전파
         raise NotImplementedError()
+    
     
 class Square(Function):
     def forward(self, x):
@@ -60,15 +70,22 @@ def numerical_diff(f, x, eps = 1e-4):
     y1 = f(x1)
     return (y1.data - y0.data / (2 * eps))
 
-A = Square()
-B = Exp()
-C = Square()
+def square(x):
+    return Square()(x)
+
+def exp(x):
+    return Exp()(x)
+
+def as_arrray(x):
+    if np.isscalar(x):
+        return np.array(x)
+    return x
 
 x = Variable(np.array(0.5))
-a = A(x)
-b = B(a)
-y = C(b)
+a = square(x)
+b = exp(a)
+y = square(b)
 
 y.grad = np.array(1.0)
 y.backward()
-print(b.grad)
+print(x.grad)
